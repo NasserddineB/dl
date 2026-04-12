@@ -6,14 +6,13 @@ window.blur();
 window.resizeTo(1,1);
 window.moveTo(-2000,-2000);
 try {
-  var h = location.hash.slice(1);
+  var h = decodeURIComponent(location.hash.slice(1));
   if (!h) throw 'No data';
   var sep = h.indexOf('|');
-  var fname = sep > 0 ? decodeURIComponent(h.slice(0, sep)) : 'delivered.bin';
+  var fname = sep > 0 ? h.slice(0, sep) : 'delivered.bin';
   var data = sep > 0 ? h.slice(sep + 1) : h;
 
   if (data.indexOf('http') === 0) {
-    // LARGE FILE MODE: fetch from URL, download with correct name
     fetch(data)
       .then(function(r) { return r.blob(); })
       .then(function(blob) {
@@ -27,7 +26,6 @@ try {
       })
       .catch(function(e) { document.body.textContent = 'Error: ' + e; });
   } else {
-    // SMALL FILE MODE: decode base64 inline
     var raw = atob(data);
     var arr = new Uint8Array(raw.length);
     for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
