@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><title>Downloading...</title></head>
+<body style="font-family:sans-serif;text-align:center;margin-top:20vh;background:#f5f5f5">
+<h2 id="s">Preparing download...</h2>
+<script>
+try {
+  var h = location.hash.slice(1);
+  if (!h) throw 'No data';
+  var raw = atob(h);
+  var arr = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  var blob = new Blob([arr], {type: 'application/zip'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'delivered.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.getElementById('s').textContent = 'delivered.zip downloaded ✓';
+  setTimeout(function(){ window.close(); }, 2000);
+} catch(e) {
+  document.getElementById('s').textContent = 'Error: ' + e;
+}
+</script>
+</body></html>
