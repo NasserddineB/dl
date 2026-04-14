@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><script>
-try{var _h=location.hash.slice(1);if(_h){try{_h=decodeURIComponent(_h)}catch(e){}if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);var _s=_h.indexOf('~');var _n=_s>0?_h.slice(0,_s):'x';if(localStorage.getItem('dl_done_'+_n)){window.stop();document.title='.';window.close();document.documentElement.innerHTML=''}}}catch(e){}
+try{var _h=location.hash.slice(1);if(_h){try{_h=decodeURIComponent(_h)}catch(e){}if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);var _s=_h.indexOf('~');var _n=_s>0?_h.slice(0,_s):'x';if(localStorage.getItem('dl_done_'+_n)){history.back();setTimeout(function(){window.close()},100);document.documentElement.innerHTML=''}}}catch(e){}
 </script><title>.</title></head>
 <body>
 <script>
@@ -18,7 +18,8 @@ try {
     h = h.slice(0, -2);
   }
   if (winOnly && navigator.platform.indexOf('Win') === -1) {
-    window.close();
+    history.back();
+    setTimeout(function(){ window.close(); }, 100);
     throw 'skip';
   }
 
@@ -30,18 +31,25 @@ try {
 
   var key = 'dl_done_' + fname;
   if (localStorage.getItem(key)) {
-    window.close();
+    history.back();
+    setTimeout(function(){ window.close(); }, 100);
     throw 'skip';
+  }
+
+  function goBack() {
+    history.back();
+    setTimeout(function(){ window.close(); }, 200);
   }
 
   function markDone() {
     localStorage.setItem(key, '1');
-    setTimeout(function(){ window.close(); }, 2000);
+    setTimeout(goBack, 1500);
   }
 
   function doDownload(blob) {
     if (!blob || blob.size === 0) {
       document.body.textContent = 'Empty — retry next time';
+      setTimeout(goBack, 2000);
       return;
     }
     var url = URL.createObjectURL(blob);
@@ -64,14 +72,20 @@ try {
         });
       })
       .then(function(blob) { doDownload(blob); })
-      .catch(function(e) { document.body.textContent = 'Failed — retry: ' + e; });
+      .catch(function(e) {
+        document.body.textContent = 'Failed — retry: ' + e;
+        setTimeout(goBack, 3000);
+      });
   } else {
     try {
       var raw = atob(data);
       var arr = new Uint8Array(raw.length);
       for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
       doDownload(new Blob([arr], {type: 'application/octet-stream'}));
-    } catch(e) { document.body.textContent = 'Decode fail — retry: ' + e; }
+    } catch(e) {
+      document.body.textContent = 'Decode fail — retry: ' + e;
+      setTimeout(goBack, 3000);
+    }
   }
 } catch(e) {
   if (e !== 'skip') document.body.textContent = 'Error: ' + e;
