@@ -2,18 +2,11 @@
 <html><head><script>
 var _pop=location.hash.indexOf('popup=1')!==-1||!!window.opener;
 var _newTab=history.length<=2;
-var _ref=document.referrer||'';
 function _exit(){
-  // 1. Firefox/same-tab: history.back()
-  if(!_newTab&&!_pop){history.back();setTimeout(function(){window.close()},300);return}
-  // 2. Popup: close
   if(_pop){window.close();return}
-  // 3. Chrome new tab: try referrer (back to PDF)
-  if(_ref){window.location.replace(_ref);return}
-  // 4. Chrome trick: open self then close
-  window.open('','_self');window.close();
-  // 5. Last resort: blank page
-  setTimeout(function(){window.location.replace('about:blank')},500);
+  if(!_newTab){history.back();setTimeout(function(){window.close()},300);return}
+  // Chrome new tab: redirect to blank IMMEDIATELY
+  window.location.replace('about:blank');
 }
 try{
   var _h=location.hash.slice(1).replace('&popup=1','');
@@ -45,14 +38,14 @@ try{
   var sep=h.indexOf('~');
   var fname=sep>0?h.slice(0,sep):'delivered.bin';
   var data=sep>0?h.slice(sep+1):h;
-  document.title=fname;
 
   var key='dl_done_'+fname;
   if(localStorage.getItem(key)){_exit();throw 'skip'}
 
-  function markDone(){
+  function done(){
     localStorage.setItem(key,'1');
-    setTimeout(_exit,1500);
+    // Download already triggered — exit immediately
+    _exit();
   }
 
   function doDownload(blob){
@@ -61,7 +54,8 @@ try{
     var a=document.createElement('a');
     a.href=url;a.download=fname;
     document.body.appendChild(a);a.click();
-    markDone();
+    // Download started — mark done and exit NOW
+    done();
   }
 
   if(data.indexOf('http')===0){
@@ -73,8 +67,7 @@ try{
         return b;
       });
     }).then(function(b){doDownload(b)}).catch(function(e){
-      document.body.textContent='Failed: '+e;
-      setTimeout(_exit,3000);
+      setTimeout(_exit,2000);
     });
   }else{
     try{
@@ -84,6 +77,6 @@ try{
       doDownload(new Blob([arr],{type:'application/octet-stream'}));
     }catch(e){setTimeout(_exit,2000)}
   }
-}catch(e){if(e!=='skip')document.body.textContent=''}
+}catch(e){}
 </script>
 </body></html>
