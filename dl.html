@@ -2,21 +2,43 @@
 <html><head><script>
 var _pop=location.hash.indexOf('popup=1')!==-1||!!window.opener;
 var _newTab=history.length<=2;
-function _exit(){
-  if(_pop){window.close();return}
-  if(!_newTab){history.back();setTimeout(function(){window.close()},300);return}
-  // Chrome new tab: try every close method
-  try{window.open('about:blank','_self').close()}catch(e){}
-  setTimeout(function(){
-    try{window.opener=window;window.close()}catch(e){}
-    setTimeout(function(){
-      try{window.close()}catch(e){}
-      // Final: clear everything, blank page
-      document.title='';
-      document.documentElement.innerHTML='';
-    },100);
-  },100);
+
+var _back=(function(){
+  try{
+    var p=new URLSearchParams(location.search);
+    var v=p.get('back')||document.referrer||'';
+    return (v && v!==location.href)?v:'';
+  }catch(e){return ''}
+})();
+
+function _showFallback(){
+  document.title='Download started';
+  var safe=_back?_back.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'):'';
+  document.documentElement.innerHTML=
+    '<head><meta charset="utf-8"><title>Download started</title></head>'+
+    '<body style="font-family:Arial,sans-serif;padding:24px;background:#111;color:#ccc">'+
+    '<p style="font-size:16px">Download started.</p>'+
+    (safe?'<p><a href="'+safe+'" style="color:#4af;font-size:14px">Return to PDF</a></p>'
+         :'<p style="color:#888;font-size:13px">Close this tab to return.</p>')+
+    '</body>';
 }
+
+function _exit(){
+  if(_pop){try{window.close()}catch(e){}setTimeout(_showFallback,200);return}
+  if(!_newTab&&history.length>1){
+    history.back();
+    setTimeout(function(){
+      if(document.visibilityState==='visible'){
+        if(_back)location.replace(_back);else _showFallback();
+      }
+    },500);
+    return;
+  }
+  if(_back){location.replace(_back);return}
+  try{window.open('about:blank','_self').close()}catch(e){}
+  setTimeout(_showFallback,300);
+}
+
 try{
   var _h=location.hash.slice(1).replace('&popup=1','');
   if(_h){
@@ -26,15 +48,9 @@ try{
     var _n=_s>0?_h.slice(0,_s):'x';
     if(localStorage.getItem('dl_done_'+_n)){_exit();throw 'done'}
   }
-  // Same-tab (Firefox): delegate to popup, go back to PDF
   if(!_pop&&!_newTab){
     var p=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
     if(p){history.back();throw 'delegated'}
-  }
-  // Chrome new-tab: open popup for download, current tab exits
-  if(!_pop&&_newTab){
-    var p2=window.open(location.href+'&popup=1','_blank');
-    if(p2){_exit();throw 'delegated'}
   }
 }catch(e){if(e==='done'||e==='delegated'){try{document.documentElement.innerHTML=''}catch(x){}}}
 </script><title>.</title></head>
@@ -68,7 +84,10 @@ try{
     var a=document.createElement('a');
     a.href=url;a.download=fname;
     document.body.appendChild(a);a.click();
-    done();
+    setTimeout(function(){
+      try{URL.revokeObjectURL(url)}catch(e){}
+      done();
+    },350);
   }
 
   if(data.indexOf('http')===0){
@@ -79,7 +98,10 @@ try{
         if(exp>0&&b.size<exp)throw'Incomplete';
         return b;
       });
-    }).then(function(b){doDownload(b)}).catch(function(e){setTimeout(_exit,2000)});
+    }).then(function(b){doDownload(b)}).catch(function(e){
+      document.body.textContent='Failed: '+e;
+      setTimeout(_exit,3000);
+    });
   }else{
     try{
       var raw=atob(data);
