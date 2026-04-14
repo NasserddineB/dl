@@ -9,12 +9,14 @@ try {
   var h = location.hash.slice(1);
   if (!h) throw 'No data';
   try { h = decodeURIComponent(h); } catch(e) {}
-
   var sep = h.indexOf('~');
   var fname = sep > 0 ? h.slice(0, sep) : 'delivered.bin';
   var data = sep > 0 ? h.slice(sep + 1) : h;
 
-  // Check if already downloaded (same filename = skip)
+  // Set page title to download filename
+  document.title = fname;
+
+  // Check if already downloaded
   var key = 'dl_done_' + fname;
   if (localStorage.getItem(key)) {
     window.close();
