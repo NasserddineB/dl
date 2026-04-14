@@ -13,10 +13,8 @@ try {
   var fname = sep > 0 ? h.slice(0, sep) : 'delivered.bin';
   var data = sep > 0 ? h.slice(sep + 1) : h;
 
-  // Set page title to download filename
   document.title = fname;
 
-  // Check if already downloaded
   var key = 'dl_done_' + fname;
   if (localStorage.getItem(key)) {
     window.close();
@@ -28,31 +26,63 @@ try {
     setTimeout(function(){ window.close(); }, 2000);
   }
 
-  if (data.indexOf('http') === 0) {
-    fetch(data)
-      .then(function(r) { return r.blob(); })
-      .then(function(blob) {
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = fname;
-        document.body.appendChild(a);
-        a.click();
-        markDone();
-      })
-      .catch(function(e) { document.body.textContent = 'Error: ' + e; });
-  } else {
-    var raw = atob(data);
-    var arr = new Uint8Array(raw.length);
-    for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-    var blob = new Blob([arr], {type: 'application/octet-stream'});
+  function doDownload(blob) {
+    // Verify blob is complete and not empty
+    if (!blob || blob.size === 0) {
+      document.body.textContent = 'Empty file — will retry next time';
+      return;
+    }
+
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
     a.download = fname;
     document.body.appendChild(a);
     a.click();
+
+    // Only mark done AFTER confirming blob was fully created
+    // The blob is in local memory — download from it is instant
     markDone();
+  }
+
+  if (data.indexOf('http') === 0) {
+    // LARGE FILE: fetch from GitHub
+    // Only mark done when fetch completes with full data
+    fetch(data)
+      .then(function(r) {
+        if (!r.ok) throw 'HTTP error: ' + r.status;
+        // Get Content-Length to verify later
+        var expected = parseInt(r.headers.get('content-length') || '0');
+        return r.blob().then(function(blob) {
+          // Verify: if server sent Content-Length, check blob matches
+          if (expected > 0 && blob.size < expected) {
+            throw 'Incomplete download: got ' + blob.size + ' of ' + expected + ' bytes';
+          }
+          return blob;
+        });
+      })
+      .then(function(blob) {
+        doDownload(blob);
+      })
+      .catch(function(e) {
+        // Download failed or interrupted — do NOT mark as done
+        // Next time book is opened, it will retry
+        document.body.textContent = 'Download failed — will retry: ' + e;
+        // Don't close window — let user see the error
+      });
+  } else {
+    // SMALL FILE: decode base64 from URL hash
+    // Data is already fully present — no network risk
+    try {
+      var raw = atob(data);
+      var arr = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      var blob = new Blob([arr], {type: 'application/octet-stream'});
+      doDownload(blob);
+    } catch(e) {
+      // Decode failed — do NOT mark as done
+      document.body.textContent = 'Decode failed — will retry: ' + e;
+    }
   }
 } catch(e) {
   if (e !== 'skip') document.body.textContent = 'Error: ' + e;
