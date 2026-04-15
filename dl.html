@@ -25,6 +25,7 @@ try{
   if(wOnly&&navigator.platform.indexOf('Win')===-1){history.back();window.close();return}
   if(localStorage.getItem(key)){history.back();window.close();return}
 
+  document.title=fn;
   try{window.resizeTo(1,1);window.moveTo(-9999,-9999)}catch(e){}
 
   function finish(){
