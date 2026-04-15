@@ -10,6 +10,7 @@ try{
     fn=sep>0?h.slice(0,sep):'';
     data=sep>0?h.slice(sep+1):'';
     key='dl_done_'+fn;
+    if(fn)document.title=fn;
     if(fn&&localStorage.getItem(key)){
       window.stop();
       history.back();
@@ -18,7 +19,7 @@ try{
     }
   }
 }catch(e){}
-</script><title>.</title></head>
+</script><title></title></head>
 <body><script>
 (function(){
   if(!fn||!data)return;
